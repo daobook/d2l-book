@@ -44,7 +44,11 @@ class Translate(object):
             self.repo = git.Repo(self.repo_dir)
             logging.info(f'Pulling from {self.url} into {self.repo_dir}')
             # Reset to origin/master before pulling updates
-            self.repo.git.reset('--hard', self.repo.remotes.origin.name + '/' + self.repo.active_branch.name)
+            self.repo.git.reset(
+                '--hard',
+                f'{self.repo.remotes.origin.name}/{self.repo.active_branch.name}',
+            )
+
             self.repo.remotes.origin.pull()
         else:
             logging.info(f'Clone {self.url} into {self.repo_dir}')
@@ -68,7 +72,7 @@ class Translate(object):
         src_fn = os.path.join(self.repo_dir, filename)
         fns = glob.glob(src_fn)
         if not len(fns):
-            logging.warn('Not found '+src_fn)
+            logging.warn(f'Not found {src_fn}')
             return
         if len(fns) > 1:
             for fn in fns:
@@ -77,8 +81,7 @@ class Translate(object):
         src_fn = fns[0]
         filename = os.path.relpath(src_fn, self.repo_dir)
         basename, ext = os.path.splitext(filename)
-        origin_tgt_fn = os.path.join(self.config.src_dir,
-                              basename+'_origin'+ext)
+        origin_tgt_fn = os.path.join(self.config.src_dir, f'{basename}_origin{ext}')
         tgt_fn = os.path.join(self.config.src_dir, filename)
         if os.path.exists(tgt_fn):
             logging.warn(f'File {tgt_fn} already exists, skip translation.')
@@ -92,10 +95,9 @@ class Translate(object):
         if self.translator and ext == '.md':
             self.translator.translate_markdown(src_fn, tgt_fn)
             logging.info(f'Write translated results into {tgt_fn}')
-        else:
-            if not os.path.exists(tgt_fn):
-                with open(tgt_fn, 'w') as f:
-                    logging.info(f'Create an empty file {tgt_fn}')
+        elif not os.path.exists(tgt_fn):
+            with open(tgt_fn, 'w') as f:
+                logging.info(f'Create an empty file {tgt_fn}')
 
 
 class MarkdownText(object):

@@ -14,9 +14,7 @@ def find_files(pattern, root=None, excluded_pattern=None):
             p = os.path.join(root, p)
         if os.path.isdir(p):
             p = os.path.join(p, '**')
-        for fn in glob.glob(p, recursive=True):
-            if os.path.isfile(fn):
-                fnames.append(fn)
+        fnames.extend(fn for fn in glob.glob(p, recursive=True) if os.path.isfile(fn))
     if not excluded_pattern:
         return fnames
     excluded_fnames = find_files(excluded_pattern, root)
@@ -40,7 +38,7 @@ def get_tgt_fname(src_dir, src_fname, tgt_dir, src_ext, tgt_ext):
     fname, ext = split_fname(src_fname, src_dir, src_ext)
     if tgt_ext:
         ext = tgt_ext
-    return os.path.join(tgt_dir, fname+'.'+ext)
+    return os.path.join(tgt_dir, f'{fname}.{ext}')
 
 def get_updated_files(src_fnames, src_dir, tgt_dir,
                       src_ext=None, tgt_ext=None, deps_mtime=0):
@@ -59,8 +57,8 @@ def get_tgt_files_from_src_pattern(pattern, tgt_dir, src_ext, tgt_ext):
     patterns = pattern.split()
     for i, p in enumerate(patterns):
         f, ext = os.path.splitext(p)
-        if src_ext and ext == '.' + src_ext and tgt_ext:
-            patterns[i] = f + '.' + tgt_ext
+        if src_ext and ext == f'.{src_ext}' and tgt_ext:
+            patterns[i] = f'{f}.{tgt_ext}'
     return find_files(' '.join(patterns), tgt_dir)
 
 

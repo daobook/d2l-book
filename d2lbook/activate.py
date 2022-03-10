@@ -24,10 +24,9 @@ _tab_re = re.compile('# *@tab +([\w]+)')
 def _get_cell_tab(cell, default_tab):
     if cell['type'] != 'code':
         return []
-    if not '.input' in cell['class'] and not 'python' in cell['class']:
+    if '.input' not in cell['class'] and 'python' not in cell['class']:
         return []
-    match = common.source_tab_pattern.search(cell['source'])
-    if match:
+    if match := common.source_tab_pattern.search(cell['source']):
         return [tab.strip() for tab in match[1].split(',')]
     return [default_tab]
 

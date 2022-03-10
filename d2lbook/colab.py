@@ -57,16 +57,15 @@ class Colab():
                 continue
             # Use Python3 as the kernel
             update_notebook_kernel(nb, "python3", "Python 3")
-            # Check if GPU is needed
-            use_gpu = False
-            for cell in nb.cells:
-                if cell.cell_type == 'code':
-                    if self.config['gpu_pattern'] in cell.source:
-                        use_gpu = True
-                        break
+            use_gpu = any(
+                cell.cell_type == 'code'
+                and self.config['gpu_pattern'] in cell.source
+                for cell in nb.cells
+            )
+
             if use_gpu:
                 nb['metadata'].update({"accelerator": "GPU"})
-                logging.info('Use GPU for '+fn)
+                logging.info(f'Use GPU for {fn}')
             # Update SVG image URLs
             if self.config['replace_svg_url']:
                 _update_svg_urls(nb, self.config['replace_svg_url'], fn, colab_dir)
@@ -92,21 +91,19 @@ class Colab():
                     colab_html += f'<div class="d2l-tabs__tab">{colab_tab}</div>'
                 colab_html = f'<div class="d2l-tabs" style="float:right">{colab_html}</div>'
             else:
-                colab_html = _get_colab_html(self._repo[None], url, f'Colab')
-            html = html.replace('</h1>', colab_html+'</h1>')
+                colab_html = _get_colab_html(self._repo[None], url, 'Colab')
+            html = html.replace('</h1>', f'{colab_html}</h1>')
             with open(fn, 'w') as f:
                 f.write(html)
 
 def _get_colab_html(repo, url, text):
     id = text.replace(" ", "_")
     colab_link = f'https://colab.research.google.com/github/{repo}/blob/master/{url}'
-    colab_html = f'<a href="{colab_link}" onclick="captureOutboundLink(\'{colab_link}\'); return false;"> <button style="float:right", id="{id}" class="mdl-button mdl-js-button mdl-button--primary mdl-js-ripple-effect"> <i class=" fas fa-external-link-alt"></i> {text} </button></a><div class="mdl-tooltip" data-mdl-for="{id}"> Open the notebook in Colab</div>'
-    return colab_html
+    return f'<a href="{colab_link}" onclick="captureOutboundLink(\'{colab_link}\'); return false;"> <button style="float:right", id="{id}" class="mdl-button mdl-js-button mdl-button--primary mdl-js-ripple-effect"> <i class=" fas fa-external-link-alt"></i> {text} </button></a><div class="mdl-tooltip" data-mdl-for="{id}"> Open the notebook in Colab</div>'
 
 def insert_additional_installation(notebook, lib, lib_header):
     if lib:
-        cell = _get_installation_cell(notebook, lib)
-        if cell:
+        if cell := _get_installation_cell(notebook, lib):
             notebook.cells.insert(0, cell)
             if lib_header:
                 notebook.cells.insert(
@@ -161,7 +158,8 @@ def _get_installation_cell(notebook, libs):
                     find_libs.append(m[1])
     if not find_libs:
         return None
-    install_str = ''
-    for lib in set(find_libs):
-        install_str += '!pip install ' + lib_dict[lib] + '\n'
+    install_str = ''.join(
+        f'!pip install {lib_dict[lib]}' + '\n' for lib in set(find_libs)
+    )
+
     return nbformat.v4.new_code_cell(source=install_str)

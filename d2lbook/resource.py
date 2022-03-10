@@ -39,9 +39,9 @@ def get_notebook_gpus(notebook, max_gpus):
     n_gpus = 0
     for cell in notebook.cells:
         if cell.cell_type == 'code':
-            if any([p in cell.source for p in single_gpu_patterns]):
+            if any(p in cell.source for p in single_gpu_patterns):
                 n_gpus = max(n_gpus, 1)
-            if any([p in cell.source for p in all_gpus_patterns]):
+            if any(p in cell.source for p in all_gpus_patterns):
                 n_gpus = max(n_gpus, max_gpus)
     return n_gpus
 
@@ -97,8 +97,7 @@ class Scheduler():
 
     def add(self, num_cpus, num_gpus, target, args, description=''):
         """Add tasks into the queue."""
-        assert not (num_cpus == 0 and num_gpus == 0), \
-                'Need at least one CPU or GPU'
+        assert num_cpus != 0 or num_gpus != 0, 'Need at least one CPU or GPU'
         assert num_cpus <= self._num_cpus and num_gpus <= self._num_gpus, \
             f'Not enough resources (CPU {self._num_cpus}, GPU {self._num_gpus} ) to run the task (CPU {num_cpus}, GPU {num_gpus})'
 
@@ -133,7 +132,7 @@ class Scheduler():
             return ', '.join(info)
 
         def _runtime(task):
-            end_time = task.end_time if task.end_time else datetime.datetime.now(
+            end_time = task.end_time or datetime.datetime.now(
             )
             return utils.get_time_diff(task.start_time, end_time)
 

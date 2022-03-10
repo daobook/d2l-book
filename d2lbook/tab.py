@@ -14,7 +14,7 @@ if os.path.exists(_LAST_TAB_FILE):
 
 def select_tab(tab=_LAST_TAB):
     _LOG(f'Selected tab "{tab}", all other code cells not marked as "{tab}" will be ignored in execution.\n')
-    _LOG(f'This code block will be deleted during build.')
+    _LOG('This code block will be deleted during build.')
     sys.modules[__name__]._TAB = tab
     if tab:
         with open(_LAST_TAB_FILE, 'w') as f:

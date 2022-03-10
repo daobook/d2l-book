@@ -57,10 +57,9 @@ def _save_block(source: str, save_mark: str):
     lines = source.splitlines()
     block = []
     for i, l in enumerate(lines):
-        m = re.search(f'# *{save_mark}', l)
-        if m:
-            l = l[:m.span()[0]].rstrip()
-            if l: block.append(l)
+        if m := re.search(f'# *{save_mark}', l):
+            if l := l[: m.span()[0]].rstrip():
+                block.append(l)
             for j in range(i + 1, len(lines)):
                 l = lines[j]
                 if not l.startswith(' ') and len(l):
@@ -86,8 +85,7 @@ def _save_code(input_fn, save_mark='@save', tab=None,
     saved = []
     for i, cell in enumerate(nb.cells):
         if cell.cell_type == 'code':
-            block = _save_block(cell.source, save_mark)
-            if block:
+            if block := _save_block(cell.source, save_mark):
                 label = _find_latest_label(nb.cells[:i-1])
                 saved.append([block, label, input_fn])
     return saved
@@ -124,12 +122,11 @@ def _refactor_blocks(saved_blocks):
     # merge @d2l.save_to_class
     new_blocks = []
     class_blocks = {}
-    for i, (block, _, _) in enumerate(saved_blocks):
+    for block, _, _ in saved_blocks:
         lines = block.split('\n')
         if lines[0].startswith('class'):
             new_blocks.append(block)
-            m = re.search('class +([\w\_]+)', lines[0])
-            if m:                 
+            if m := re.search('class +([\w\_]+)', lines[0]):
                 class_blocks[m.groups()[0]] = len(new_blocks) - 1
             continue
         register = '@d2l.add_to_class'
@@ -139,11 +136,12 @@ def _refactor_blocks(saved_blocks):
                 new_blocks.append(parts[0])
             if len(parts) > 1:
                 for p in parts[1:]:
-                    m = re.search('\@d2l\.add_to_class\(([\.\w\_]+)\)', p[0])
-                    if m:
+                    if m := re.search(
+                        '\@d2l\.add_to_class\(([\.\w\_]+)\)', p[0]
+                    ):
                         cls = m.groups()[0].split('.')[-1]
                         new_blocks[class_blocks[cls]] += '\n\n' + '\n'.join(['    '+l for l in p[1:]])
-                continue            
+                continue
         new_blocks.append(block)
 
     return '\n\n'.join(new_blocks)
@@ -208,10 +206,7 @@ def save_alias(tab_lib):
 
 def replace_call(source: str, mapping, replace_fn):
 
-    matched = False
-    for a in mapping:
-        if 'd2l.'+a in source:
-            matched = True
+    matched = any(f'd2l.{a}' in source for a in mapping)
     if not matched:
         return source
     lines = source.splitlines()
@@ -226,8 +221,7 @@ def replace_call(source: str, mapping, replace_fn):
                 isinstance(node.func.value, ast.Name) and
                 node.func.value.id == 'd2l' and
                 node.func.attr in mapping):
-                new_node = replace_fn(node, mapping[node.func.attr])
-                if new_node:
+                if new_node := replace_fn(node, mapping[node.func.attr]):
                     source = source.replace(
                         ast.get_source_segment(source, node),
                         new_node if isinstance(new_node, str) else node_to_source(new_node))
@@ -257,11 +251,11 @@ def replace_args_alias(source, args_mapping):
         key_value = {a : node_to_source(arg) for arg, a in zip(node.args, a_args)}
         for kw in node.keywords:
             assert kw.arg in a_kwargs, (kw.arg, a_kwargs)
-            key_value['='+kw.arg] = '='+node_to_source(kw.value)
+            key_value[f'={kw.arg}'] = f'={node_to_source(kw.value)}'
         # remove not appeared keywords
         b_call = ast.parse(b).body[0].value
         if isinstance(b_call, ast.Call):
-            new_keywords = [kw for kw in b_call.keywords if '='+kw.value.id in key_value]
+            new_keywords = [kw for kw in b_call.keywords if f'={kw.value.id}' in key_value]
             b_call.keywords = new_keywords
             b = node_to_source(b_call)
         for k, v in key_value.items():
@@ -317,27 +311,6 @@ def format_code(source: str):
     source = '\n'.join([l.rstrip() for l in source.split('\n')]).strip()
 
     # Disable yapf, as it doesn't work well for long sentences
-    return source
-
-    # fix the bug that yapf cannot handle jupyter magic
-    for l in source.splitlines():
-        if l.startswith('%') or l.startswith('!'):
-            return source
-
-    # fix the bug that yapf remove the tailling ;
-    has_tailling_semicolon = source.rstrip().endswith(';')
-
-    style = {
-        'DISABLE_ENDING_COMMA_HEURISTIC': True,
-        'SPACE_BETWEEN_ENDING_COMMA_AND_CLOSING_BRACKET': False,
-        'SPLIT_BEFORE_CLOSING_BRACKET': False,
-        'SPLIT_BEFORE_DICT_SET_GENERATOR': False,
-        'SPLIT_BEFORE_LOGICAL_OPERATOR': False,
-        'SPLIT_BEFORE_NAMED_ASSIGNS': False,
-        'COLUMN_LIMIT': 78,
-        'BLANK_LINES_AROUND_TOP_LEVEL_DEFINITION': 1,}
-    source = FormatCode(source, style_config=style)[0].strip()
-    if has_tailling_semicolon: source += ';'
     return source
 
 def format_code_nb(nb):
