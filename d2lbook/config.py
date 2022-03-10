@@ -57,7 +57,7 @@ class Config():
         if ext and ext != '.md':
             logging.info('Ignore the file extesion, %s, specified by index in %s',
                          ext, config_fname)
-        index_fname = os.path.join(self.src_dir, index_fname+'.md')
+        index_fname = os.path.join(self.src_dir, f'{index_fname}.md')
         if not os.path.exists(index_fname):
             logging.fatal('Failed to find the index file: %s', index_fname)
             exit(-1)
@@ -66,8 +66,7 @@ class Config():
             # Infer the book title from the index page
             with open(index_fname, 'r') as f:
                 for line in f:
-                    line = line.strip()
-                    if line:
+                    if line := line.strip():
                         if line.startswith('#'):
                             line = line[1:]
                         self.project['title'] = line.strip()
@@ -129,4 +128,4 @@ class Config():
         dirname = self._default_tab_dir(dirname)
         if tab == self.default_tab:
             return dirname
-        return dirname + '_' + tab
+        return f'{dirname}_{tab}'

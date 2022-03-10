@@ -44,10 +44,10 @@ def _once(func):
     def warp(self):
         name = func.__name__
         if self.config.tab:
-            name += '_' + self.config.tab
+            name += f'_{self.config.tab}'
         if name in self.done and self.done[name]:
             return
-        full_name = 'd2lbook build ' + name
+        full_name = f'd2lbook build {name}'
         tik = datetime.datetime.now()
         func(self)
         logging.info('=== Finished "%s" in %s', full_name,
@@ -151,7 +151,7 @@ class Builder(object):
         )
         scheduler = resource.Scheduler(num_cpu_workers, len(gpus))
         run_cells = self.config.build['eval_notebook'].lower() == 'true'
-        for i, (src, tgt) in enumerate(updated_notebooks):
+        for src, tgt in updated_notebooks:
             mkdir(os.path.dirname(tgt))
             _process_and_eval_notebook(scheduler, src, tgt, run_cells,
                                        self.config)
@@ -177,10 +177,11 @@ class Builder(object):
 
         if must_incls:
             must_incls = set(must_incls)
-        tgt_files_to_rm = [
-            f for f in notebooks_to_rm + non_notebooks_to_rm
-            if not must_incls or f not in must_incls]
-        if tgt_files_to_rm:
+        if tgt_files_to_rm := [
+            f
+            for f in notebooks_to_rm + non_notebooks_to_rm
+            if not must_incls or f not in must_incls
+        ]:
             tgt_files_to_rm_concise = hide_individual_data_files(
                 tgt_files_to_rm)
             logging.info(
@@ -234,8 +235,7 @@ class Builder(object):
         updated_notebooks = get_updated_files(notebooks, default_eval_dir,
                                               self.config.eval_dir, 'ipynb',
                                               'ipynb')
-        tab_dirs = [
-            default_eval_dir + '_' + tab for tab in self.config.tabs[1:]]
+        tab_dirs = [f'{default_eval_dir}_{tab}' for tab in self.config.tabs[1:]]
         for default, merged in updated_notebooks:
             src_notebooks = [default]
             for tab_dir in tab_dirs:
@@ -360,10 +360,18 @@ class Builder(object):
 
         script = self.config.pdf['post_latex']
         process_latex(self.config.tex_fname, script)
-        run_cmd(['cd', self.config.pdf_dir, '&& make'])        
+        run_cmd(['cd', self.config.pdf_dir, '&& make'])
         if self.config.tab != self.config.default_tab:
             p = self.config.project['name']
-            run_cmd(['cd', self.config.pdf_dir, '&& cp ', p+'.pdf', p+'-'+self.config.tab+'.pdf' ])        
+            run_cmd(
+                [
+                    'cd',
+                    self.config.pdf_dir,
+                    '&& cp ',
+                    f'{p}.pdf',
+                    f'{p}-{self.config.tab}.pdf',
+                ]
+            )        
 
     @_once
     def pkg(self):
@@ -396,9 +404,7 @@ class Builder(object):
             for nb in notebooks:
                 library.save_file(root_dir, nb)
 
-        # deprecated, can be removed later
-        save_patterns = self.config.library['save_patterns']
-        if save_patterns:
+        if save_patterns := self.config.library['save_patterns']:
             items = split_config_str(save_patterns, num_items_per_line=2)
             for lib_fname, tab in items:
                 library.save_tab(notebooks, lib_fname, tab,
@@ -438,10 +444,12 @@ def update_ipynb_toc(root):
                 md_cells = markdown.split_markdown(cell.source)
                 for c in md_cells:
                     if c['type'] == 'code' and c['class'] == 'toc':
-                        toc = []
-                        for l in c['source'].split('\n'):
-                            if l and not l.startswith(':'):
-                                toc.append(' - [%s](%s.ipynb)' % (l, l))
+                        toc = [
+                            ' - [%s](%s.ipynb)' % (l, l)
+                            for l in c['source'].split('\n')
+                            if l and not l.startswith(':')
+                        ]
+
                         c['source'] = '\n'.join(toc)
                         c['type'] = 'markdown'
                 cell.source = markdown.join_markdown_cells(md_cells)
@@ -453,8 +461,7 @@ def _process_and_eval_notebook(scheduler, input_fn, output_fn, run_cells,
     with open(input_fn, 'r') as f:
         md = f.read()
     nb = notebook.read_markdown(md)
-    tab = config.tab
-    if tab:
+    if tab := config.tab:
         # get the tab
         nb = notebook.split_markdown_cell(nb)
         nb = notebook.get_tab_notebook(nb, tab, config.default_tab)
@@ -486,8 +493,9 @@ def ipynb2rst(input_fn, output_fn):
     nb = remove_slide_marks(nb)
     sig = hashlib.sha1(input_fn.encode()).hexdigest()[:6]
     resources = {
-        'unique_key':
-        'output_' + rm_ext(os.path.basename(output_fn)) + '_' + sig}
+        'unique_key': f'output_{rm_ext(os.path.basename(output_fn))}_{sig}'
+    }
+
     body, resources = rst_lib.convert_notebook(nb, resources)
     with open(output_fn, 'w') as f:
         f.write(body)
@@ -535,7 +543,7 @@ def process_latex(fname, script):
         f.write('\n'.join(lines))
     # Execute custom process_latex script
     if script:
-        cmd = "python " + script + " " + fname
+        cmd = f"python {script} {fname}"
         process = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE,
                                    stderr=subprocess.PIPE)
         stdout, stderr = process.communicate()
@@ -552,7 +560,7 @@ def _combine_citations(lines):
 # E.g., tag = 'begin{figure}'
 def _tag_in_line(tag, line):
     assert '\\' not in set(tag)
-    return any([elem.startswith(tag) for elem in line.split('\\')])
+    return any(elem.startswith(tag) for elem in line.split('\\'))
 
 def _center_graphics(lines):
     tabulary_cnt = 0

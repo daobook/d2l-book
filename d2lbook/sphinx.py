@@ -60,10 +60,12 @@ class SphinxEnv(object):
 
     def _update_header_links(self):
         items = utils.split_config_str(self.config.html['header_links'], 3)
-        sphinx_links = ''
-        for tk in items:
-            if tk:
-                sphinx_links += "('%s', '%s', True, '%s')," % (tk[0], tk[1], tk[2])
+        sphinx_links = ''.join(
+            "('%s', '%s', True, '%s')," % (tk[0], tk[1], tk[2])
+            for tk in items
+            if tk
+        )
+
         self._update_pyconf('header_links', sphinx_links)
 
     def _write_js(self):

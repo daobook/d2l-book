@@ -91,16 +91,14 @@ def _is_mark(lines):
     if isinstance(lines, str):
         lines = [lines]
     for l in lines:
-        l = l.strip()
-        if l:
+        if l := l.strip():
             m = re.match(rf':{token}:(`{token}`)?', l)
             if m is None or m.span() != (0, len(l)):
                 return False
     return True
 
 def _list(line, prev_prefix):
-    m = re.match(r' *[-\*\+] *', line) or re.match(r' *[\d]+\. *', line)
-    if m:
+    if m := re.match(r' *[-\*\+] *', line) or re.match(r' *[\d]+\. *', line):
         if prev_prefix is not None and len(prev_prefix.split('__')) == 2:
             p = int(prev_prefix.split('__')[1]) + 1
         else:
@@ -127,7 +125,7 @@ def split_text(text: str) -> List[Dict[str, str]]:
     paras = ['\n'.join(item) for empty_line, item in groups if not empty_line]
 
     def _fallback(p, type):
-        logging.warn(f'Wrong {type} format:\n' + p)
+        logging.warn(f'Wrong {type} format:\n{p}')
         cells.append({'type': 'text', 'source': p})
 
     cells = []

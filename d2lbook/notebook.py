@@ -71,9 +71,10 @@ def get_cell_tab(cell: notebooknode.NotebookNode,
         return [tab] if type(tab) == str else tab
     if cell.cell_type != 'code':
         return []
-    match = (common.source_tab_pattern.search(cell.source) or
-             common.source_tab_pattern_2.search(cell.source))
-    if match:
+    if match := (
+        common.source_tab_pattern.search(cell.source)
+        or common.source_tab_pattern_2.search(cell.source)
+    ):
         return [tab.strip() for tab in match[1].split(',')]
     return [default_tab,]
 
@@ -88,13 +89,8 @@ def get_tab_notebook(nb: notebooknode.NotebookNode, tab: str,
     records its position in the original notebook `nb`.
     """
     if tab != default_tab:
-        has_tab = False
-        for cell in nb.cells:
-            if tab in get_cell_tab(cell):
-                has_tab = True
-                break
-        if not has_tab and any(
-            [cell.cell_type == 'code' for cell in nb.cells]):
+        has_tab = any(tab in get_cell_tab(cell) for cell in nb.cells)
+        if not has_tab and any(cell.cell_type == 'code' for cell in nb.cells):
             return None
 
     matched_tab = False
@@ -102,10 +98,7 @@ def get_tab_notebook(nb: notebooknode.NotebookNode, tab: str,
     for i, cell in enumerate(nb.cells):
         new_cell = copy.deepcopy(cell)
         new_cell.metadata['origin_pos'] = i
-        cell_tab = get_cell_tab(new_cell, default_tab)
-        if not cell_tab:
-            new_cells.append(new_cell)
-        else:
+        if cell_tab := get_cell_tab(new_cell, default_tab):
             if cell_tab == ['all'] or tab in cell_tab:
                 # drop the cell contains `%load_ext d2lbook.tab`
                 if '%load_ext d2lbook.tab' in new_cell.source:
@@ -118,16 +111,20 @@ def get_tab_notebook(nb: notebooknode.NotebookNode, tab: str,
                     src_tab = (common.source_tab_pattern.search(line) or
                                common.source_tab_pattern_2.search(line))
                     text_tab = common.md_mark_pattern.search(line)
-                    if src_tab or (text_tab and (text_tab[1] == 'begin_tab' or
-                                                 text_tab[1] == 'end_tab')):
+                    if (
+                        src_tab
+                        or text_tab
+                        and text_tab[1] in ['begin_tab', 'end_tab']
+                    ):
                         del lines[j]
 
                     # TODO, also remove the tailing #@save
                     lines = _clean_if_branches(lines, tab)
                     new_cell.source = '\n'.join(lines)
                 new_cells.append(new_cell)
-    if not matched_tab and any([cell.cell_type == 'code'
-                                for cell in nb.cells]):
+        else:
+            new_cells.append(new_cell)
+    if not matched_tab and any(cell.cell_type == 'code' for cell in nb.cells):
         return None
     return create_new_notebook(nb, new_cells)
 
@@ -136,7 +133,7 @@ def _clean_if_branches(lines, tab):
     """
     #TODO make it more general purpose
     mark = 'tab.selected'
-    if not any([mark in l for l in lines]):
+    if all(mark not in l for l in lines):
         return _clean_if_branches_old(lines, tab)
     # 1 means in a matched if branch,
     # 2 means in a not matched if branch
@@ -145,8 +142,8 @@ def _clean_if_branches(lines, tab):
     indent = 0
     _leading_spaces = lambda l: len(l) - len(l.lstrip())
     new_lines = []
-    for i, l in enumerate(lines):
-        assert '\t' not in l, 'please use space in ' + l
+    for l in lines:
+        assert '\t' not in l, f'please use space in {l}'
         if 'if' in l and mark in l:
             mode = 1 if (f'"{tab}"' in l or f"'{tab}'" in l) else 2
             indent = _leading_spaces(l)
@@ -156,7 +153,7 @@ def _clean_if_branches(lines, tab):
             mode = 0
         if mode == 0:
             new_lines.append(l)
-        if mode == 1:
+        elif mode == 1:
             new_lines.append(l[4:])
     return new_lines
 
@@ -165,11 +162,7 @@ def _clean_if_branches_old(lines, tab):
     """
     #TODO make it more general purpose
     mark = 'd2l.USE_'
-    matched = False
-    for l in lines:
-        if mark in l:
-            matched = True
-            break
+    matched = any(mark in l for l in lines)
     if not matched:
         return lines
     # 1 means in a matched if branch,
@@ -179,8 +172,8 @@ def _clean_if_branches_old(lines, tab):
     indent = 0
     _leading_spaces = lambda l: len(l) - len(l.lstrip())
     new_lines = []
-    for i, l in enumerate(lines):
-        assert '\t' not in l, 'please use space in ' + l
+    for l in lines:
+        assert '\t' not in l, f'please use space in {l}'
         if 'if' in l and mark in l:
             mode = 1 if mark+tab.upper() in l else 2
             indent = _leading_spaces(l)
@@ -190,7 +183,7 @@ def _clean_if_branches_old(lines, tab):
             mode = 0
         if mode == 0:
             new_lines.append(l)
-        if mode == 1:
+        elif mode == 1:
             new_lines.append(l[4:])
     return new_lines
 
@@ -205,9 +198,11 @@ def merge_tab_notebooks(
 
     The reserved function of get_tab_notebook.
     """
-    n = max([
-        max([cell.metadata['origin_pos'] for cell in nb.cells])
-        for nb in src_notebooks])
+    n = max(
+        max(cell.metadata['origin_pos'] for cell in nb.cells)
+        for nb in src_notebooks
+    )
+
     new_cells = [[] for _ in range(n + 1)]  # type: ignore
 
     # for compatability
@@ -220,11 +215,10 @@ def merge_tab_notebooks(
                 if _has_output(new_cells[p][-1]) or _has_output(
                         cell) or new_cells[p][-1].source != cell.source:
                     new_cells[p].append(cell)
-                else:
-                    if 'tab' in cell.metadata:
-                        tab = tab_list(new_cells[p][-1].metadata['tab'])
-                        tab.extend(tab_list(cell.metadata['tab']))
-                        new_cells[p][-1].metadata['tab'] = tab
+                elif 'tab' in cell.metadata:
+                    tab = tab_list(new_cells[p][-1].metadata['tab'])
+                    tab.extend(tab_list(cell.metadata['tab']))
+                    new_cells[p][-1].metadata['tab'] = tab
             else:
                 new_cells[p].append(cell)
     expanded_cells = []
@@ -262,12 +256,7 @@ def _merge_tabs(nb: notebooknode.NotebookNode, tabs: List[str]):
         if not in_tab:
             new_groups.append((False, cells))
             continue
-        # a special case that we can merge into non-tab cells
-        mergable = True
-        for cell in cells:
-            if set(cell.metadata['tab']) != set(tabs):
-                mergable = False
-                break
+        mergable = all(set(cell.metadata['tab']) == set(tabs) for cell in cells)
         if mergable:
             new_groups.append((False, cells))
             continue
@@ -287,10 +276,12 @@ def _merge_tabs(nb: notebooknode.NotebookNode, tabs: List[str]):
         for i, (tab, tab_cell) in enumerate(group):
             new_tab_cell = []
             for cell in tab_cell:
-                if (len(new_tab_cell) > 0 and
-                        new_tab_cell[-1].cell_type == 'code' and
-                        cell.cell_type == 'code' and
-                        not _has_output(new_tab_cell[-1])):
+                if (
+                    new_tab_cell
+                    and new_tab_cell[-1].cell_type == 'code'
+                    and cell.cell_type == 'code'
+                    and not _has_output(new_tab_cell[-1])
+                ):
                     cell = copy.deepcopy(cell)
                     cell.source = new_tab_cell[-1].source + '\n\n' + cell.source
                     new_tab_cell[-1] = cell
@@ -350,7 +341,7 @@ def _get_subpages(input_fn):
             for l in cell.source.split('\n'):
                 l = l.strip()
                 if not l.startswith(':'):
-                    fn = os.path.join(os.path.dirname(input_fn), l + '.md')
+                    fn = os.path.join(os.path.dirname(input_fn), f'{l}.md')
                     if os.path.exists(fn):
                         subpages.append(fn)
     return subpages

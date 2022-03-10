@@ -72,7 +72,14 @@ class Deployer(object):
 
     def _get_pdfs(self):        
         # get all generated pdfs
-        pdfs = list(glob.glob(self.config.tgt_dir+'/pdf*/'+self.config.project['name']+'*.pdf'))
+        pdfs = list(
+            glob.glob(
+                f'{self.config.tgt_dir}/pdf*/'
+                + self.config.project['name']
+                + '*.pdf'
+            )
+        )
+
         rets = []
         for p in pdfs:
             p = pathlib.Path(p)

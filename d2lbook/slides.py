@@ -24,7 +24,7 @@ def slides():
     for fn in args.filename:
         fns = glob.glob(fn)
         if not len(fns):
-            logging.warning('Not found ' + fn)
+            logging.warning(f'Not found {fn}')
             return
         for md in fns:
             with open(md, 'r') as f:
@@ -32,8 +32,11 @@ def slides():
             if tab:
                 nb = notebook.split_markdown_cell(nb)
                 nb = notebook.get_tab_notebook(nb, tab, cf.default_tab)
-            output_fn = str(pathlib.Path(md).with_suffix('')) + (
-                '_' + tab if tab else '_') + '_slides.ipynb'
+            output_fn = (
+                str(pathlib.Path(md).with_suffix(''))
+                + (f'_{tab}' if tab else '_')
+            ) + '_slides.ipynb'
+
             sd.generate(nb, output_fn)
 
 class Slides():
@@ -105,9 +108,9 @@ You can also preview them in nbviwer:
         utils.mkdir(dirname)
         with open(output_fn, 'w') as f:
             f.write(nbformat.writes(nb))
-        logging.info('Write slides into ' + output_fn)
+        logging.info(f'Write slides into {output_fn}')
 
-        with open(dirname + '/rise.css', 'w') as f:
+        with open(f'{dirname}/rise.css', 'w') as f:
             f.write('''
 div.text_cell_render.rendered_html {
     padding: 0.35em 0.1em;
@@ -235,7 +238,7 @@ def _match_slide_marks(text: str):
             if i < len(start) - 1:
                 assert e < start[i + 1], f'some {p} are overlapped'
             # handle if it's a markdown link such as [**a**](https://xx)
-            if p[1].endswith(']') and text.startswith(p[1] + '(', e):
+            if p[1].endswith(']') and text.startswith(f'{p[1]}(', e):
                 continue
             matches.append((p, s, e))
     matches.sort(key=lambda x: x[1])
